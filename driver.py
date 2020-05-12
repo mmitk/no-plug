@@ -40,6 +40,7 @@ def loop():
 
 if __name__ == "__main__":
     #avail = threading.Event()
+    ctypes.windll.user32.MessageBoxW(0, 'Script Started', "Battery Indicator", 1)
     thread = threading.Thread(target = loop)
     thread.start()
     

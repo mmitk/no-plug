@@ -12,7 +12,7 @@ ROOMS = {} # dict to track active rooms
 #def index():
 
 
-@socketio.on('create'):
+@socketio.on('create')
 def on_create(data):
     us = user.User()
     room = us.user_id
