@@ -1,57 +1,74 @@
 import psutil
 import threading
+import ctypes
+import requests, json
+import time
 #import Tkinter
 #import tkMessageBox
 
-class battery_indicator:
-    def __init__(self):
-        self.battery = psutil.sensors_battery()
-        self.is_charging = self.battery.power_plugged
-        self.percent = self.battery.percent
-        self.status = False
 
-    @property
-    def is_plugged(self):
-        return self.is_plugged
-
-    def update(self):
-        self.percent = self.battery.percent
-        self.is_charging = self.battery.power_plugged
-
-        if self.is_charging == True and self.percent == 99:
-            self.status = True
-    
-    def get_status(self):
-        return self.status
-
-
-def loop():
-    bat_indicator = battery_indicator()
-    global unplug_status 
-    unplug_status = True
-    while not bat_indicator.get_status():
-        bat_indicator.update()
-        if not bat_indicator.is_charging: 
-            unplug_status = False
-            return False
-
-
+def display_message(status, lock):
+    lock.acquire()
+    if status == 'unplugged':
+        msg = 'Unplugged your laptop'
+        ctypes.windll.user32.MessageBoxW(0, msg, "Battery Indicator", 1)
+    elif status == 'charged':
+        msg = 'You\'re battery is charged! time to unplug!'
+        ctypes.windll.user32.MessageBoxW(0, msg, "Battery Indicator", 1)
+    elif status == 'started':
+         ctypes.windll.user32.MessageBoxW(0, 'Script Started', "Battery Indicator", 1)
+    lock.release()
 
 
 if __name__ == "__main__":
-    #avail = threading.Event()
-    ctypes.windll.user32.MessageBoxW(0, 'Script Started', "Battery Indicator", 1)
-    thread = threading.Thread(target = loop)
-    thread.start()
-    
-    thread.join()
 
+    url = 'http://127.0.0.1:5000/script/status'
+    lock = threading.Lock()
+ 
+    is_charging = False
+    while True:
+        battery = psutil.sensors_battery()
+        #is_charging = battery.power_plugged
+        #percent = battery.percent
+        
+        if is_charging == True and battery.power_plugged == False:
+            #msg = 'Unplugged your laptop'
+            #ctypes.windll.user32.MessageBoxW(0, msg, "Battery Indicator", 1)
+            thread1 = threading.Thread(target=display_message, args=('unplugged',lock))
+            thread1.daemon = True                            # Daemonize thread
+            thread1.start()                                  # Start the execution
+            data = {'Status': 'unplugged', 'Precentage': percent}
+            data_json = json.dumps(data)
+            r = requests.post(url, json=data)
+            print(r.content)
+            continue
+        
+        percent = battery.percent
+        is_charging = battery.power_plugged
+        
+        if is_charging == True and percent >= 99:
+            #msg = 'You\'re battery is charged! time to unplug!'
+            #ctypes.windll.user32.MessageBoxW(0, msg, "Battery Indicator", 1)
+            thread2 = threading.Thread(target=display_message, args=('charged',lock))
+            thread2.daemon = True                            # Daemonize thread
+            thread2.start()   
+            data = {'Status': 'charged', 'Precentage': percent}
+            data_json = json.dumps(data)
+            r = requests.post(url, json=data)
+            print(r.content.decode("utf-8"))
 
-    if unplug_status:
-        msg = 'You\'re battery is charged! time to unplug!'
-    else:
-        msg = 'Battery unplugged, charge is: {}'.format(psutil.sensors_battery().percent)
+        elif is_charging == False:
+            data = {'Status': 'unplugged', 'Precentage': percent}
+            data_json = json.dumps(data)
+            r = requests.post(url, json=data)
+            print(r.content.decode("utf-8"))
 
-    import ctypes  # An included library with Python install.   
-    ctypes.windll.user32.MessageBoxW(0, msg, "Battery Indicator", 1)
-#print('Current Battery Perecentage: {}\n Plugged in status: {}'.format(str(percent), str(is_plugged)))
+        else:
+            data = {'Status': 'charging', 'Precentage': percent}
+            data_json = json.dumps(data)
+            r = requests.post(url, json=data)
+            print(r.content.decode("utf-8"))
+
+        
+        # DEBUGGING
+        time.sleep(1)
